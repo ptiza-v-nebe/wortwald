@@ -608,7 +608,7 @@ class Game {
     ctx.fillStyle = "rgba(14,10,26,0.67)"; ctx.fillRect(0, 0, WIDTH, HEIGHT);
     drawText(ctx, "Wortwald", WIDTH / 2, 170, 120, DE, { center: true, bold: true });
     drawText(ctx, "Лес слов", WIDTH / 2, 245, 40, WHITE, { center: true });
-    drawText(ctx, "немецкий, который сначала чувствуешь, а потом говоришь", WIDTH / 2, 300, 24, MUTED, { center: true });
+    drawText(ctx, "маленькая деревня, большой лес и немного немецкого", WIDTH / 2, 300, 24, MUTED, { center: true });
     this.drawFunke(ctx, WIDTH / 2 + 250 + Math.sin(this.time) * 10, 150 + Math.sin(this.time * 1.7) * 8, 1.6);
     this.titleOptions().forEach((o, i) => {
       const r = [WIDTH / 2 - 160, 370 + i * 64, 320, 54], sel = i === this.titleSel && !this.touch;
