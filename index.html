@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#140e1c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Wortwald — Лес слов (v4.2)</title>
+<title>Wortwald — Лес слов (v4.3)</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0e0a16; overflow: hidden; touch-action: none;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -1015,35 +1015,58 @@ class Audio {
 }
 
 class Speech {
+  // v4.3: more robust on real browsers - voices are looked up again when they appear late,
+  // a paused engine is resumed, the utterance is kept alive (Chrome drops collected ones),
+  // speak() comes a moment after cancel() (some engines swallow it otherwise), errors are reported.
   constructor() {
-    this.voice = null; this.available = false;
+    this.voice = null; this.available = false; this.deCount = 0; this.allCount = 0; this.lastError = ""; this.onError = null; this.cur = null; this.timer = 0;
     this.synth = (typeof window !== "undefined" && window.speechSynthesis) || null;
     if (!this.synth) return;
-    const pick = () => {
-      const vs = this.synth.getVoices() || [];
-      const de = vs.filter(v => (v.lang || "").toLowerCase().replace("_", "-").startsWith("de"));
-      const pref = de.find(v => /anna|petra|google|de-de/i.test(v.name + v.lang) && v.localService) || de.find(v => v.localService) || de[0];
-      if (pref) { this.voice = pref; this.available = true; }
-      else if (vs.length) this.available = false;
-    };
-    pick();
-    try { this.synth.addEventListener("voiceschanged", pick); } catch (e) { this.synth.onvoiceschanged = pick; }
+    this.pick();
+    try { this.synth.addEventListener("voiceschanged", () => this.pick()); } catch (e) { this.synth.onvoiceschanged = () => this.pick(); }
     this.assumeOk = true;   // Android often reports no voices until the first utterance: try anyway with lang=de-DE
+  }
+  pick() {
+    if (!this.synth) return;
+    const vs = this.synth.getVoices() || [];
+    const de = vs.filter(v => (v.lang || "").toLowerCase().replace("_", "-").startsWith("de"));
+    this.allCount = vs.length; this.deCount = de.length;
+    const pref = de.find(v => /anna|petra|google|de-de/i.test(v.name + v.lang) && v.localService) || de.find(v => v.localService) || de[0];
+    if (pref) { this.voice = pref; this.available = true; }
+    else if (vs.length) this.available = false;
+  }
+  status() {
+    if (!this.synth) return "этот браузер не умеет говорить";
+    if (!this.allCount) this.pick();
+    const name = this.voice ? this.voice.name : "голос по умолчанию (de-DE)";
+    return `${name} · немецких голосов: ${this.deCount} из ${this.allCount}` + (this.lastError ? ` · ошибка: ${this.lastError}` : "");
   }
   unlock() {
     if (!this.synth) return;
-    try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "de-DE"; this.synth.speak(u); } catch (e) { }
+    try { this.synth.resume(); const u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "de-DE"; this.cur = u; this.synth.speak(u); } catch (e) { }
   }
   say(text) {
     if (!this.synth || !text) return;
-    text = text.replace(/…/g, " ");
+    text = text.replace(/…/g, " ").trim();
+    if (!text) return;
+    if (!this.voice) this.pick();
+    const s = this.synth;
     try {
-      this.synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "de-DE"; u.rate = 0.85;
-      if (this.voice) u.voice = this.voice;
-      this.synth.speak(u);
+      if (s.speaking || s.pending) s.cancel();
+      if (s.paused) s.resume();
     } catch (e) { }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = this.voice ? this.voice.lang : "de-DE"; u.rate = 0.85;
+    if (this.voice) u.voice = this.voice;
+    u.onstart = () => { this.lastError = ""; };
+    u.onerror = e => {
+      const err = (e && e.error) || "error";
+      if (err === "interrupted" || err === "canceled") return;
+      this.lastError = err; if (this.onError) this.onError(err);
+    };
+    this.cur = u;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { try { s.speak(u); } catch (e) { this.lastError = String(e); } }, 50);
   }
 }
 
@@ -2715,6 +2738,7 @@ class Game {
     this.auto = !!opts.auto; this.touch = false;
     this.art = new Art(); this.art.build();
     this.audio = new Audio();
+    this.audio.speech.onError = err => { if (this._voiceErr) return; this._voiceErr = true; this.toast("Голос не звучит (" + err + "). Подробности: ESC → меню", MUTED); };
     this.state = "title"; this.titleSel = 0; this.time = 0;
     this.portraitCache = {};
     this.keys = new Set(); this.joy = null; this.runHeld = false; this.btns = [];
@@ -3448,7 +3472,7 @@ class Menu {
     if (i === 0) g.overlay = null;
     else if (i === 1) g.overlay = new Book(g);
     else if (i === 2) g.audio.toggleMusic();
-    else if (i === 3) g.audio.voiceOn = !g.audio.voiceOn;
+    else if (i === 3) { g.audio.voiceOn = !g.audio.voiceOn; if (g.audio.voiceOn) g.audio.say("Hallo! Ich bin der Funke."); }
     else if (i === 4) { g.touch = !g.touch; g.manualControls = true; }
     else if (i === 5) { if (!g.busy()) g.save(); g.overlay = null; g.state = "title"; g.titleSel = 0; g.debug = null; g.debugAuto = false; }
   }
@@ -3461,6 +3485,7 @@ class Menu {
       panel(ctx, r, { color: sel ? PANEL2 : PANEL, border: sel ? GOLD : MUTED, width: sel ? 3 : 2 });
       drawText(ctx, o, r[0] + 180, r[1] + 25, 30, WHITE, { center: true });
     });
+    drawText(ctx, "Голос: " + this.g.audio.speech.status(), WIDTH / 2, HEIGHT - 92, 20, [170, 160, 190], { center: true });
     drawText(ctx, "Игра сама сохраняется после каждой сцены (в этом браузере).", WIDTH / 2, HEIGHT - 60, 22, MUTED, { center: true });
   }
 }

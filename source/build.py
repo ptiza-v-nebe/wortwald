@@ -23,7 +23,7 @@ HTML = """<!DOCTYPE html>
 <meta name="theme-color" content="#140e1c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Wortwald — Лес слов (v4.2)</title>
+<title>Wortwald — Лес слов (v4.3)</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0e0a16; overflow: hidden; touch-action: none;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }

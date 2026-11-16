@@ -15,6 +15,7 @@ class Game {
     this.auto = !!opts.auto; this.touch = false;
     this.art = new Art(); this.art.build();
     this.audio = new Audio();
+    this.audio.speech.onError = err => { if (this._voiceErr) return; this._voiceErr = true; this.toast("Голос не звучит (" + err + "). Подробности: ESC → меню", MUTED); };
     this.state = "title"; this.titleSel = 0; this.time = 0;
     this.portraitCache = {};
     this.keys = new Set(); this.joy = null; this.runHeld = false; this.btns = [];
@@ -748,7 +749,7 @@ class Menu {
     if (i === 0) g.overlay = null;
     else if (i === 1) g.overlay = new Book(g);
     else if (i === 2) g.audio.toggleMusic();
-    else if (i === 3) g.audio.voiceOn = !g.audio.voiceOn;
+    else if (i === 3) { g.audio.voiceOn = !g.audio.voiceOn; if (g.audio.voiceOn) g.audio.say("Hallo! Ich bin der Funke."); }
     else if (i === 4) { g.touch = !g.touch; g.manualControls = true; }
     else if (i === 5) { if (!g.busy()) g.save(); g.overlay = null; g.state = "title"; g.titleSel = 0; g.debug = null; g.debugAuto = false; }
   }
@@ -761,6 +762,7 @@ class Menu {
       panel(ctx, r, { color: sel ? PANEL2 : PANEL, border: sel ? GOLD : MUTED, width: sel ? 3 : 2 });
       drawText(ctx, o, r[0] + 180, r[1] + 25, 30, WHITE, { center: true });
     });
+    drawText(ctx, "Голос: " + this.g.audio.speech.status(), WIDTH / 2, HEIGHT - 92, 20, [170, 160, 190], { center: true });
     drawText(ctx, "Игра сама сохраняется после каждой сцены (в этом браузере).", WIDTH / 2, HEIGHT - 60, 22, MUTED, { center: true });
   }
 }

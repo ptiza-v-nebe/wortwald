@@ -123,34 +123,57 @@ class Audio {
 }
 
 class Speech {
+  // v4.3: more robust on real browsers - voices are looked up again when they appear late,
+  // a paused engine is resumed, the utterance is kept alive (Chrome drops collected ones),
+  // speak() comes a moment after cancel() (some engines swallow it otherwise), errors are reported.
   constructor() {
-    this.voice = null; this.available = false;
+    this.voice = null; this.available = false; this.deCount = 0; this.allCount = 0; this.lastError = ""; this.onError = null; this.cur = null; this.timer = 0;
     this.synth = (typeof window !== "undefined" && window.speechSynthesis) || null;
     if (!this.synth) return;
-    const pick = () => {
-      const vs = this.synth.getVoices() || [];
-      const de = vs.filter(v => (v.lang || "").toLowerCase().replace("_", "-").startsWith("de"));
-      const pref = de.find(v => /anna|petra|google|de-de/i.test(v.name + v.lang) && v.localService) || de.find(v => v.localService) || de[0];
-      if (pref) { this.voice = pref; this.available = true; }
-      else if (vs.length) this.available = false;
-    };
-    pick();
-    try { this.synth.addEventListener("voiceschanged", pick); } catch (e) { this.synth.onvoiceschanged = pick; }
+    this.pick();
+    try { this.synth.addEventListener("voiceschanged", () => this.pick()); } catch (e) { this.synth.onvoiceschanged = () => this.pick(); }
     this.assumeOk = true;   // Android often reports no voices until the first utterance: try anyway with lang=de-DE
+  }
+  pick() {
+    if (!this.synth) return;
+    const vs = this.synth.getVoices() || [];
+    const de = vs.filter(v => (v.lang || "").toLowerCase().replace("_", "-").startsWith("de"));
+    this.allCount = vs.length; this.deCount = de.length;
+    const pref = de.find(v => /anna|petra|google|de-de/i.test(v.name + v.lang) && v.localService) || de.find(v => v.localService) || de[0];
+    if (pref) { this.voice = pref; this.available = true; }
+    else if (vs.length) this.available = false;
+  }
+  status() {
+    if (!this.synth) return "этот браузер не умеет говорить";
+    if (!this.allCount) this.pick();
+    const name = this.voice ? this.voice.name : "голос по умолчанию (de-DE)";
+    return `${name} · немецких голосов: ${this.deCount} из ${this.allCount}` + (this.lastError ? ` · ошибка: ${this.lastError}` : "");
   }
   unlock() {
     if (!this.synth) return;
-    try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "de-DE"; this.synth.speak(u); } catch (e) { }
+    try { this.synth.resume(); const u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "de-DE"; this.cur = u; this.synth.speak(u); } catch (e) { }
   }
   say(text) {
     if (!this.synth || !text) return;
-    text = text.replace(/…/g, " ");
+    text = text.replace(/…/g, " ").trim();
+    if (!text) return;
+    if (!this.voice) this.pick();
+    const s = this.synth;
     try {
-      this.synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "de-DE"; u.rate = 0.85;
-      if (this.voice) u.voice = this.voice;
-      this.synth.speak(u);
+      if (s.speaking || s.pending) s.cancel();
+      if (s.paused) s.resume();
     } catch (e) { }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = this.voice ? this.voice.lang : "de-DE"; u.rate = 0.85;
+    if (this.voice) u.voice = this.voice;
+    u.onstart = () => { this.lastError = ""; };
+    u.onerror = e => {
+      const err = (e && e.error) || "error";
+      if (err === "interrupted" || err === "canceled") return;
+      this.lastError = err; if (this.onError) this.onError(err);
+    };
+    this.cur = u;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { try { s.speak(u); } catch (e) { this.lastError = String(e); } }, 50);
   }
 }
