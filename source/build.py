@@ -8,7 +8,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import words  # the same vocabulary as the Python version
 
-data = "const WORDS = %s;\nconst ORDER = %s;\nconst HAT = %s;\n" % (
+VERSION = "v4.6"
+data = "const GAME_VERSION = \"" + VERSION + "\";\n" + "const WORDS = %s;\nconst ORDER = %s;\nconst HAT = %s;\n" % (
     json.dumps(words.W, ensure_ascii=False),
     json.dumps(words.ORDER),
     json.dumps({("null" if k is None else k): list(v) for k, v in words.HAT_COLORS.items()}),
@@ -23,7 +24,7 @@ HTML = """<!DOCTYPE html>
 <meta name="theme-color" content="#140e1c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Wortwald — Лес слов (v4.5)</title>
+<title>Wortwald — Лес слов (v4.6)</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0e0a16; overflow: hidden; touch-action: none;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }

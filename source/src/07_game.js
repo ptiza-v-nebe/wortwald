@@ -781,6 +781,7 @@ class Menu {
   draw(ctx) {
     ctx.fillStyle = "rgba(10,6,20,0.75)"; ctx.fillRect(0, 0, WIDTH, HEIGHT);
     drawText(ctx, "Пауза", WIDTH / 2, 110, 56, GOLD, { center: true, bold: true });
+    drawText(ctx, "Wortwald " + GAME_VERSION, WIDTH - 20, HEIGHT - 30, 20, [150, 140, 170], { right: true });
     this.options().forEach((o, i) => {
       const r = [WIDTH / 2 - 180, 170 + i * 60, 360, 50], sel = i === this.sel && !this.g.touch;
       panel(ctx, r, { color: sel ? PANEL2 : PANEL, border: sel ? GOLD : MUTED, width: sel ? 3 : 2 });
