@@ -120,6 +120,19 @@ class Game {
     storeSet(SAVE_KEY, JSON.stringify(data));
   }
   hasSave() { return !!storeGet(SAVE_KEY); }
+  // v4.5: a saved position outside the map or inside a wall (old exit bug) -> nearest walkable tile
+  rescuePlayer() {
+    const p = this.player, w = this.world;
+    let tx = Math.floor(p.x / TILE), ty = Math.floor((p.y - 4) / TILE);
+    const ok = (x, y) => x > 0 && y > 0 && x < w.w - 1 && y < w.h - 1 && !w.solidTile(x, y);
+    if (ok(tx, ty)) return;
+    tx = Math.max(1, Math.min(w.w - 2, tx)); ty = Math.max(1, Math.min(w.h - 2, ty));
+    for (let r = 0; r < Math.max(w.w, w.h); r++)
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !ok(tx + dx, ty + dy)) continue;
+        p.x = (tx + dx + 0.5) * TILE; p.y = (ty + dy + 1) * TILE - 4; return;
+      }
+  }
   load() {
     let d; try { d = JSON.parse(storeGet(SAVE_KEY)); } catch (e) { return false; }
     if (!d) return false;
@@ -130,7 +143,8 @@ class Game {
     this.goalText = d.goal || ""; this.chapterLabel = d.label || ""; this.chapter = d.chapter || 1; this.playTime = d.playTime || 0; this.weak = d.weak || {};
     this.worlds = {};
     this.enter(LOCATIONS[d.loc] ? d.loc : "square", [15, 13], "down");
-    if (d.pos) { this.player.x = d.pos[0]; this.player.y = d.pos[1]; this.snapCam(); }
+    if (d.pos) { this.player.x = d.pos[0]; this.player.y = d.pos[1]; }
+    this.rescuePlayer(); this.snapCam();
     if (this.has("lantern")) this.lantern = true;
     return true;
   }
@@ -268,9 +282,19 @@ class Game {
       if (tx < ex.x0 || tx > ex.x1 || ty < ex.y0 || ty > ex.y1) continue;
       if (ex.cond && !this.has(ex.cond.flag)) {
         // step back and hear why
-        const back = { up: [0, 1], down: [0, -1], left: [1, 0], right: [-1, 0] }[ex.x0 === 0 ? "right" : ex.x1 === this.world.w - 1 ? "left" : ex.y0 === 0 ? "down" : "up"];
-        p.x += back[0] * TILE * 0.9; p.y += back[1] * TILE * 0.9;
-        if (this.bumpCool <= 0) { this.bumpCool = 2; this.run((function* (g) { yield g.flags.has("funke") ? g.say("funke", ex.cond.msg) : g.think(ex.cond.msg); })(this)); }
+        // v4.5: push back INTO the map (the old table pushed the hero off the edge)
+        const back = ex.x0 === 0 ? [1, 0] : ex.x1 === this.world.w - 1 ? [-1, 0] : ex.y0 === 0 ? [0, 1] : [0, -1];
+        p.x += back[0] * TILE * 1.2; p.y += back[1] * TILE * 1.2;
+        p.dir = { "1,0": "right", "-1,0": "left", "0,1": "down", "0,-1": "up" }[back.join(",")];
+        this.keys.clear(); this.joy = null;
+        if (this.bumpCool <= 0) {
+          this.bumpCool = 2;
+          this.run((function* (g) {
+            const sayIt = t => g.flags.has("funke") ? g.say("funke", t) : g.think(t);
+            yield sayIt(ex.cond.msg);
+            if (g.goalText) yield sayIt("Сейчас важнее другое. " + g.goalText);
+          })(this));
+        }
         return;
       }
       this.run(Story.travel(this, ex.to, ex.at, ex.dir));

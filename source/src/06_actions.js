@@ -100,7 +100,8 @@ function drawSayBox(ctx, g, speaker, text, shown, finished, t) {
     drawText(ctx, name, x, BOX[1] - 12, 28, GOLD, { bold: true });
   }
   const rect = [x, BOX[1] + 22, BOX[0] + BOX[2] - x - 24, BOX[3] - 30];
-  drawMixed(ctx, think ? "(" + text + ")" : text, g.known, rect, 29, Math.floor(shown), g.name);
+  // the brackets of a thought are two extra letters: count them, or the closing one never appears
+  drawMixed(ctx, think ? "(" + text + ")" : text, g.known, rect, 29, Math.floor(shown) + (think && finished ? 2 : 0), g.name);
   if (finished && Math.floor(t * 3) % 2 === 0) {
     const bx = BOX[0] + BOX[2], by = BOX[1] + BOX[3];
     ctx.fillStyle = rgb(GOLD); ctx.beginPath(); ctx.moveTo(bx - 30, by - 24); ctx.lineTo(bx - 18, by - 24); ctx.lineTo(bx - 24, by - 16); ctx.fill();
