@@ -41,7 +41,9 @@ class Entity {
       if (this.wanderT <= 0) {
         this.wanderT = 2 + Math.random() * 3;
         const tx = this.home[0] + uniform(-1, 1) * this.wander * TILE, ty = this.home[1] + uniform(-1, 1) * this.wander * TILE * 0.6;
-        if (!world.blockedRect([tx - 8, ty - 6, 16, 8], false, this)) this.path.push([tx, ty]);
+        // v4.7: wanderers do not pick a spot on top of the hero
+        const pl = world.player, nearHero = pl && Math.hypot(pl.x - tx, pl.y - ty) < 30;
+        if (!nearHero && !world.blockedRect([tx - 8, ty - 6, 16, 8], false, this)) this.path.push([tx, ty]);
       }
     }
     this.moving = false;

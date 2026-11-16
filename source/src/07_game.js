@@ -41,7 +41,7 @@ class Game {
     return this.worlds[id];
   }
   enter(id, at, dir) {
-    this.loc = id; this.world = this.getWorld(id);
+    this.loc = id; this.world = this.getWorld(id); this.world.player = this.player;
     const p = this.player;
     p.x = (at[0] + 0.5) * TILE; p.y = (at[1] + 1) * TILE - 4; if (dir) p.dir = dir;
     p.jumpT = 0; p.size = "normal"; p.scale = p.targetScale = 1;
@@ -338,6 +338,10 @@ class Game {
     const len = Math.hypot(dx, dy); dx /= len; dy /= len;
     const small = p.size === "small";
     let moved = false;
+    // v4.7: an animal that wandered INTO the hero must not trap him - let him walk out of it
+    const inside = this.world.entities.filter(e => e !== p && e.visible && e.solid && rectsOverlap(e.rect(), p.rect()));
+    for (const e of inside) e.solid = false;
+    try {
     for (const [ax, ay] of [[dx, 0], [0, dy]]) {
       if (!ax && !ay) continue;
       const r = p.rect(), nx = p.x + ax * sp * dt, ny = p.y + ay * sp * dt;
@@ -345,6 +349,7 @@ class Game {
       if (!this.world.blockedRect(nr, small, p)) { p.x = nx; p.y = ny; moved = true; }
       else if (Math.abs(ax) > 0.3 || Math.abs(ay) > 0.3) this.bump(nr);
     }
+    } finally { for (const e of inside) e.solid = true; }
     p.moving = moved;
     if (moved) {
       p.stepT += dt * (running ? 1.6 : 1);
